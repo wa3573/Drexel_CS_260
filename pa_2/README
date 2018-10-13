@@ -1,0 +1,23 @@
+For the timing procedures, trees have been constructed as follows.
+Given k levels, (height - 1, assuming nodes with label '1' are of height
+0), the procedure creates a full tree of order 3 with the following labeling
+convention:  
+								  					  
+								  		 [  3  ]
+								  	 /  	|	   \
+								 [ 2 ]	  [	2 ]    [ 2 ]
+								 / | \	  /	| \    / | \
+							    1  1  1  1  1  1  1  1  1
+							  
+	preorder = 	3, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1
+	postorder = 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 3
+
+It was verified that the preorder, postorder and inorder traversals all
+visit the nodes in the correct order. 
+
+Everything works. Forgive the inconsistencies in the code, still learning.
+
+Any other relevant information has been included in the code comments.
+
+
+	

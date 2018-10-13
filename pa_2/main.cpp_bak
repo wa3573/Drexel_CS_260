@@ -1,0 +1,1088 @@
+/*
+ * main.cpp
+ *
+ *
+ *      CSV output: implementation, n, taverse_pre_avg, taverse_pre_avg
+ *
+ *
+ *  Created on: Jul 31, 2018
+ *      Author: Juniper
+ */
+
+#include <iostream>
+#include <cstring>
+#include <cstdint>
+#include <initializer_list>
+#include <assert.h>
+#include <chrono>
+#include <list>
+#include <fstream>
+#include <algorithm>
+
+//#include <stdlib.h>
+#include "queue.cpp"
+//#include "list.cpp"
+#include "tree_loc.h"
+#include "tree_lcrs.cpp"
+#include "tree_lcrs_cursor.cpp"
+#include "style.h"
+
+#define OUTPUT_FILE "out.csv"
+
+int count = 0; 	// for traverse debug
+static volatile bool VERBOSE = true;
+static volatile int n;
+static volatile int runs = 1;
+
+
+/* Instantiate cursor space for the LCRS implementation:
+ * This allows all the objects to share the same CURSOR_SPACE variable
+ * without loosing the benefits of object orientation
+ */
+namespace TreeLCRS_cur
+{
+	template<typename T>
+	node<T> CURSOR_SPACE[T_LCRS_CUR_SPACE_SIZE];
+
+	bool CURSOR_SPACE_INITIALIZED = false;
+	node_ptr avail;
+}
+
+template<typename T>
+void t_traverse_pre_LOC(TreeLOC::Tree<T>* t, TreeLOC::node<T>* n)
+{
+	TreeLOC::node<T>* c;
+
+	if (count > 25)
+	{
+		return;
+	}
+
+	/* Code here for preorder ops */
+	if (VERBOSE)
+	{
+		std::cout << t->LABEL(n)->get_value() << ", ";
+	}
+	c = t->LEFTMOST_CHILD(n);
+	count++;
+
+	while (c != NULL)
+	{
+		t_traverse_pre_LOC(t, c);
+		c = t->RIGHT_SIBLING(c);
+	}
+
+
+}
+
+template<typename T>
+void t_traverse_post_LOC(TreeLOC::Tree<T>* t, TreeLOC::node<T>* n)
+{
+	TreeLOC::node<T>* c;
+
+	if (count > 25)
+	{
+		return;
+	}
+
+	c = t->LEFTMOST_CHILD(n);
+	count++;
+
+	while (c != NULL)
+	{
+		t_traverse_post_LOC(t, c);
+		c = t->RIGHT_SIBLING(c);
+	}
+
+	/* Code here for postorder ops */
+	if (VERBOSE)
+	{
+		std::cout << t->LABEL(n)->get_value() << ", ";
+	}
+
+
+}
+
+template<typename T>
+void t_traverse_pre_LCRS_cur(TreeLCRS_cur::Tree<T> t, TreeLCRS_cur::node<T> n)
+{
+	TreeLCRS_cur::node<T> c;
+	TreeLCRS_cur::node<T> last;
+
+//	if (count > 25)
+//	{
+//		return;
+//	}
+
+	/* Code here for preorder ops */
+	if (VERBOSE)
+	{
+		std::cout << t.LABEL(n).value << ", ";
+	}
+
+	c = t.LEFTMOST_CHILD(n);
+//	count++;
+
+	last = c;
+	while (last.right_sib != 0)
+	{
+		last = c;
+		t_traverse_pre_LCRS_cur(t, c);
+		c = t.RIGHT_SIBLING(c);
+	}
+}
+
+template<typename T>
+void t_traverse_post_LCRS_cur(TreeLCRS_cur::Tree<T> t, TreeLCRS_cur::node<T> n)
+{
+	TreeLCRS_cur::node<T> c;
+	TreeLCRS_cur::node<T> last;
+
+//	if (count > 25)
+//	{
+//		return;
+//	}
+
+	c = t.LEFTMOST_CHILD(n);
+//	count++;
+
+	last = c;
+	while (last.right_sib != 0)
+	{
+		last = c;
+		t_traverse_post_LCRS_cur(t, c);
+		c = t.RIGHT_SIBLING(c);
+	}
+
+	/* Code here for postorder ops */
+	if (VERBOSE)
+	{
+		std::cout << t.LABEL(n).value << ", ";
+	}
+
+}
+
+/* Note: the computational complexity of this solution is O(n^2)
+ * this is a result of the requirement that we only use the basic list ops,
+ * A better approach would be the so called, "divide and conquer" method
+ * which utilizes recursion and direct manipulation of list nodes and
+ * their "next" field, specifically.
+ *
+ * Also, I have re-implemented this List::List class as a template,
+ * allowing any data type to be stored inside the nodes, the function names
+ * are not identical (e.g. init() instead of MAKENULL()) but each has its
+ * counterpart, and the core implementation details are the same.
+ */
+
+template<typename T>
+List::List<T>* merge_sorted(List::List<T>* arr[], int n)
+{
+	List::List<T>* res = new List::List<T>;
+	List::node<T>* p1;
+	List::node<T>* p2;
+
+	int i;
+
+	// Initialize result to first list
+	res = arr[0];
+
+	// For each of the other lists
+	for (i = 1; i < n; i++)
+	{
+		// Set pointers to first node of result and this iteration's list
+		p1 = res->front();
+		p2 = arr[i]->front();
+
+		// Traverse this iteration's list
+		while (arr[i]->next(p2) != NULL)
+		{
+			/* For each element of this iteration's list, find the index
+			 * to insert in the result using traversal of the result list
+			 */
+			while (p1 != res->back() && p2->data > res->next(p1)->data)
+			{
+				p1 = res->next(p1);
+			}
+
+			// Insert node in question at the determined position
+			res->insert(p2->data, p1);
+			// Move to next position in iteration's list
+			p2 = arr[i]->next(p2);
+		}
+	}
+
+	return res;
+
+}
+
+template<typename T>
+List::List<T>* list_concatenate(List::List<List::List<T>*>* l_l)
+{
+	List::List<T>* new_list = new List::List<T>;
+	List::List<T>* li_1;
+	List::node<List::List<T>*>* p1;	// pointer to a node in the list of lists
+	List::node<T>* p2;				// pointer to a node in a given list
+
+	p1 = l_l->front();				// initialize to first list
+
+	// Traverse list of lists
+	while (l_l->next(p1) != NULL)
+	{
+		li_1 = p1->data;			// get list for this iteration
+		p2 = li_1->front();			// pointer to front of that list
+
+		// Traverse iteration's list
+		while (li_1->next(p2) != NULL)
+		{
+			new_list->push_back(p2->data);	// add element to new_list
+			p2 = li_1->next(p2);			// increment list pointer
+		}
+
+		p1 = l_l->next(p1);			// increment list of lists pointer
+	}
+
+	return new_list;
+}
+
+void test_queue()
+{
+	std::cout << "\n\t========== Queue, tests ========== \n\n";
+
+	Queue::Queue<int>* Q = new Queue::Queue<int>;
+
+	std::cout << T_C_GRN << "-->> ENQUEUE(5)... <<--" << T_RESET << std::endl;
+	Q->ENQUEUE(5);
+	std::cout << "Front = " << Q->FRONT()->value << std::endl;
+	std::cout << "Back = " << Q->BACK()->value << std::endl;
+	assert(Q->FRONT()->value == 5);
+	std::cout << "(Front == 5) == true\n";
+	assert(Q->FRONT()->value == Q->BACK()->value);
+	std::cout << "(Front == Back) == true\n";
+
+	std::cout << T_C_GRN << "-->> ENQUEUE(10)... <<--" << T_RESET << std::endl;
+	Q->ENQUEUE(10);
+	std::cout << "Front = " << Q->FRONT()->value << std::endl;
+	std::cout << "Back = " << Q->BACK()->value << std::endl;
+	assert(Q->FRONT()->value == 5);
+	std::cout << "(Front == 5) == true\n";
+	assert(Q->BACK()->value == 10);
+	std::cout << "(Back == 10) == true\n";
+
+	std::cout << T_C_GRN << "-->> DEQUEUE()... <<--" << T_RESET << std::endl;
+	Q->DEQUEUE();
+	std::cout << "Front = " << Q->FRONT()->value << std::endl;
+	std::cout << "Back = " << Q->BACK()->value << std::endl;
+	assert(Q->FRONT()->value == 10);
+	std::cout << "(Front == 10) == true\n";
+	assert(Q->FRONT()->value == Q->BACK()->value);
+	std::cout << "(Front == Back) == true\n";
+}
+
+void test_tree_loc()
+{
+		/* ---- Tree: LOC ---- */
+
+	std::cout << "\n\t========== Tree: LoC, tests ========== \n\n";
+
+	TreeLOC::label* label3;
+	TreeLOC::Tree<int>* T15 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T16 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T17 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T18 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T19 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T21 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T22 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T23 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T24 = new TreeLOC::Tree<int>;
+
+	List::List<TreeLOC::Tree<int>*>* list_trees_loc = new List::List<TreeLOC::Tree<int>*>; // List of pointers to free memory after
+
+	list_trees_loc->push_back(T15);
+	list_trees_loc->push_back(T16);
+	list_trees_loc->push_back(T17);
+	list_trees_loc->push_back(T18);
+	list_trees_loc->push_back(T19);
+	list_trees_loc->push_back(T21);
+	list_trees_loc->push_back(T22);
+	list_trees_loc->push_back(T23);
+	list_trees_loc->push_back(T24);
+
+
+	label3 = new TreeLOC::label("A");
+	T15 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("B");
+	T16 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("C");
+	T17 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("D");
+	T18 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("E");
+	T19 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("G");
+	T21 = TreeLOC::CREATE2(label3, T15, T16);
+
+	label3 = new TreeLOC::label("H");
+	T22 = TreeLOC::CREATE3(label3, T17, T18, T19);
+
+	label3 = new TreeLOC::label("I");
+	T23 = TreeLOC::CREATE2(label3, T21, T22);
+
+
+	std::cout << "\n\t========== Tree: LOC, assert, using basic ADT ops, multiple-syntaxes ========== \n";
+	assert((T23->ROOT()->label->get_value()).compare("I") == 0);
+	std::cout << "Label I in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->label->get_value()).compare("G") == 0);
+	assert((T23->ROOT()->children->front()->data->label->get_value()).compare("G") == 0);
+	std::cout << "Label G in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->get_value()).compare("H") == 0);
+	assert((T23->ROOT()->children->front()->next->data->label->get_value()).compare("H") == 0);
+	std::cout << "Label H in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->LEFTMOST_CHILD()->label->get_value()).compare("A") == 0);
+	assert((T23->LEFTMOST_CHILD(T23->LEFTMOST_CHILD())->label->get_value()).compare("A") == 0);
+	std::cout << "Label A in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->get_value()).compare("B") == 0);
+	assert((T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD(T23->LEFTMOST_CHILD()))->label->get_value()).compare("B") == 0);
+	std::cout << "Label B in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->label->get_value()).compare("C") == 0);
+	assert((T23->LEFTMOST_CHILD(T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD()))->label->get_value()).compare("C") == 0);
+	std::cout << "Label C in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->get_value()).compare("D") == 0);
+	assert((T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD(T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD())))->label->get_value()).compare("D") == 0);
+	std::cout << "Label D in correct position \n";
+	assert((T23->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->RIGHT_SIBLING()->RIGHT_SIBLING()->label->get_value()).compare("E") == 0);
+	assert((T23->RIGHT_SIBLING(T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD(T23->RIGHT_SIBLING(T23->LEFTMOST_CHILD()))))->label->get_value()).compare("E") == 0);
+	std::cout << "Label E in correct position \n";
+
+	while (!list_trees_loc->empty())
+	{
+		delete list_trees_loc->front()->data;
+		list_trees_loc->pop_front();
+	}
+}
+
+void test_tree_lcrs()
+{
+	/* ---- Tree: LCRS ---- */
+
+	std::cout << "\n\t========== Tree: LCRS, tests ========== \n\n";
+
+//	TreeLCRS::Tree<int>* T5 = new TreeLCRS::Tree<int>;
+	TreeLCRS::label* label2 = new TreeLCRS::label;
+	TreeLCRS::Tree<int>* T5 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T6 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T7 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T8 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T9 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T11 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T12 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T13 = new TreeLCRS::Tree<int>;
+	TreeLCRS::Tree<int>* T14 = new TreeLCRS::Tree<int>;
+
+	List::List<TreeLCRS::Tree<int>*>* list_trees_lcrs = new List::List<TreeLCRS::Tree<int>*>; // List of pointers to free memory after
+
+	list_trees_lcrs->push_back(T5);
+	list_trees_lcrs->push_back(T6);
+	list_trees_lcrs->push_back(T7);
+	list_trees_lcrs->push_back(T8);
+	list_trees_lcrs->push_back(T9);
+	list_trees_lcrs->push_back(T11);
+	list_trees_lcrs->push_back(T12);
+	list_trees_lcrs->push_back(T13);
+	list_trees_lcrs->push_back(T14);
+
+	std::strcpy(label2->value, "A");
+	T5 = TreeLCRS::CREATE0<int>(label2);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "B");
+	T6 = TreeLCRS::CREATE0<int>(label2);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "C");
+	T7 = TreeLCRS::CREATE0<int>(label2);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "D");
+	T8 = TreeLCRS::CREATE0<int>(label2);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "E");
+	T9 = TreeLCRS::CREATE0<int>(label2);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "G");
+	T11 = TreeLCRS::CREATE2(label2, T5, T6);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "H");
+	T12 = TreeLCRS::CREATE3(label2, T7, T8, T9);
+
+	label2 = new TreeLCRS::label;
+	std::strcpy(label2->value, "I");
+	T13 = TreeLCRS::CREATE2(label2, T11, T12);
+
+	std::cout << "\n\t========== Tree: LCRS, assert, using intuitive pointers ========== \n\n";
+	assert(std::strcmp(T13->ROOT()->label->value, "I") == 0);
+	std::cout << "Label I in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->label->value, "G") == 0);
+	std::cout << "Label G in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->right_sib->label->value, "H") == 0);
+	std::cout << "Label H in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->left_child->label->value, "A") == 0);
+	std::cout << "Label A in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->left_child->right_sib->label->value, "B") == 0);
+	std::cout << "Label B in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->right_sib->left_child->label->value, "C") == 0);
+	std::cout << "Label C in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->right_sib->left_child->right_sib->
+			label->value, "D") == 0);
+	std::cout << "Label D in correct position \n";
+	assert(std::strcmp(T13->ROOT()->left_child->right_sib->left_child->right_sib->
+			right_sib->label->value, "E") == 0);
+	std::cout << "Label E in correct position \n";
+
+	std::cout << "\n\t========== Tree: LCRS, assert, using basic ADT ops, multiple-syntaxes ========== \n";
+	assert(std::strcmp(T13->ROOT()->label->value, "I") == 0);
+	std::cout << "Label I in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->label->value, "G") == 0);
+	std::cout << "Label G in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->value, "H") == 0);
+	std::cout << "Label H in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->LEFTMOST_CHILD()->label->value, "A") == 0);
+	assert(std::strcmp(T13->LEFTMOST_CHILD(T13->LEFTMOST_CHILD())->label->value, "A") == 0);
+	std::cout << "Label A in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->value, "B") == 0);
+	assert(std::strcmp(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD(T13->LEFTMOST_CHILD()))->label->value, "B") == 0);
+	std::cout << "Label B in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->label->value, "C") == 0);
+	assert(std::strcmp(T13->LEFTMOST_CHILD(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD()))->label->value, "C") == 0);
+	std::cout << "Label C in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->RIGHT_SIBLING()->label->value, "D") == 0);
+	assert(std::strcmp(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD())))->label->value, "D") == 0);
+	std::cout << "Label D in correct position \n";
+	assert(std::strcmp(T13->LEFTMOST_CHILD()->RIGHT_SIBLING()->LEFTMOST_CHILD()->RIGHT_SIBLING()->RIGHT_SIBLING()->label->value, "E") == 0);
+	assert(std::strcmp(T13->RIGHT_SIBLING(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD(T13->RIGHT_SIBLING(T13->LEFTMOST_CHILD()))))->label->value, "E") == 0);
+	std::cout << "Label E in correct position \n";
+
+	while (!list_trees_lcrs->empty())
+	{
+		delete list_trees_lcrs->front()->data;
+		list_trees_lcrs->pop_front();
+	}
+}
+
+void test_tree_lcrs_cur()
+{
+
+	std::cout << "\n\t========== Tree: LCRS, cursor, tests ========== \n\n";
+	TreeLCRS_cur::label label3;
+
+	std::strcpy(label3.value, "A");
+	TreeLCRS_cur::Tree<int> T30 = TreeLCRS_cur::CREATE0<int>(label3);
+	std::strcpy(label3.value, "B");
+	TreeLCRS_cur::Tree<int> T31 = TreeLCRS_cur::CREATE0<int>(label3);
+	std::strcpy(label3.value, "C");
+	TreeLCRS_cur::Tree<int> T32 = TreeLCRS_cur::CREATE0<int>(label3);
+	std::strcpy(label3.value, "D");
+	TreeLCRS_cur::Tree<int> T33 = TreeLCRS_cur::CREATE0<int>(label3);
+	std::strcpy(label3.value, "E");
+	TreeLCRS_cur::Tree<int> T34 = TreeLCRS_cur::CREATE0<int>(label3);
+
+	assert(std::strcmp(T30.LABEL(T30.ROOT()).value, "A") == 0);
+	std::cout << "Tree Label == 'A' \n";
+	assert(std::strcmp(T32.LABEL(T32.ROOT()).value, "C") == 0);
+	std::cout << "Tree Label == 'C' \n";
+	assert(std::strcmp(T34.LABEL(T34.ROOT()).value, "E") == 0);
+	std::cout << "Tree Label == 'E' \n";
+
+	std::strcpy(label3.value, "G");
+	TreeLCRS_cur::Tree<int> T36 = TreeLCRS_cur::CREATE2(label3, T30, T31);
+
+	std::strcpy(label3.value, "H");
+	TreeLCRS_cur::Tree<int> T37 = TreeLCRS_cur::CREATE3(label3, T32, T33, T34);
+
+	std::strcpy(label3.value, "I");
+	TreeLCRS_cur::Tree<int> T38 = TreeLCRS_cur::CREATE2(label3, T36, T37);
+
+	std::cout << "\n\t========== Tree: LCRS, Cursor implementation, assert, using basic ADT ops ========== \n";
+	assert(std::strcmp(T38.LABEL(T38.ROOT()).value, "I") == 0);
+	std::cout << "Label I in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD(T38.ROOT())).value, "G") == 0);
+	std::cout << "Label G in correct position \n";
+//		std::cout << "Label H = " << T38.LABEL(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD(T38.ROOT()))).value << std::endl;
+	assert(std::strcmp(T38.LABEL(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD(T38.ROOT()))).value, "H") == 0);
+	std::cout << "Label H in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD(T38.LEFTMOST_CHILD())).value, "A") == 0);
+	std::cout << "Label A in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD().LEFTMOST_CHILD().RIGHT_SIBLING()).value, "B") == 0);
+	assert(std::strcmp(T38.LABEL(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD(T38.LEFTMOST_CHILD()))).value, "B") == 0);
+	std::cout << "Label B in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD().RIGHT_SIBLING().LEFTMOST_CHILD()).value, "C") == 0);
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD()))).value, "C") == 0);
+	std::cout << "Label C in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD().RIGHT_SIBLING().LEFTMOST_CHILD().RIGHT_SIBLING()).value, "D") == 0);
+	assert(std::strcmp(T38.LABEL(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD())))).value, "D") == 0);
+	std::cout << "Label D in correct position \n";
+	assert(std::strcmp(T38.LABEL(T38.LEFTMOST_CHILD().RIGHT_SIBLING().LEFTMOST_CHILD().RIGHT_SIBLING().RIGHT_SIBLING()).value, "E") == 0);
+	assert(std::strcmp(T38.LABEL(T38.RIGHT_SIBLING(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD(T38.RIGHT_SIBLING(T38.LEFTMOST_CHILD()))))).value, "E") == 0);
+	std::cout << "Label E in correct position \n";
+}
+
+void time_tree_loc()
+{
+	auto t_start = std::chrono::steady_clock::now();
+	auto t_end = std::chrono::steady_clock::now();
+	auto t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+	std::ofstream file_out;
+
+	int j, k;
+	unsigned long int traverse_pre_avg = 0;
+	unsigned long int traverse_post_avg = 0;
+
+	int num_iter = ((double)n / 2) - 1;
+
+	TreeLOC::label* label4 = new TreeLOC::label("1");
+	TreeLOC::label* label5 = new TreeLOC::label("2");
+	TreeLOC::label* label6 = new TreeLOC::label("3");
+	TreeLOC::label* label_temp;
+
+//		TreeLOC::Tree<int>* T15 = TreeLOC::CREATE0<int>(label4);
+	TreeLOC::Tree<int>* t_t_11 = TreeLOC::CREATE0<int>(label4);
+	TreeLOC::Tree<int>* t_t_12 = TreeLOC::CREATE0<int>(label4);
+	TreeLOC::Tree<int>* t_t_13 = TreeLOC::CREATE0<int>(label4);
+	TreeLOC::Tree<int>* t_t_2 = new TreeLOC::Tree<int>();
+	TreeLOC::Tree<int>* t_t_3 = new TreeLOC::Tree<int>();
+	TreeLOC::Tree<int>* t_t_final = new TreeLOC::Tree<int>();
+
+	std::cout << "Generating full tree with " << n << " levels... \n";
+
+
+	/* n = 1 */
+	if (n == 1)
+	{
+		/* nothing to do */
+	/* n = 2 */
+	} else if (n == 2) {
+		t_t_final = TreeLOC::CREATE3(label5, t_t_11, t_t_12, t_t_13);
+	/* n = 3 */
+	} else if (n == 3) {
+		t_t_2 = TreeLOC::CREATE3(label5, t_t_11, t_t_12, t_t_13);
+		t_t_final = TreeLOC::CREATE3(label6, t_t_2, t_t_2, t_t_2);
+	/* general case */
+	} else {
+		t_t_2 = TreeLOC::CREATE3(label5, t_t_11, t_t_12, t_t_13);
+		t_t_3 = TreeLOC::CREATE3(label6, t_t_2, t_t_2, t_t_2);
+
+		int num_level = 4;
+		std::string str_num_level;
+		for (k = 0; k < num_iter; k++)
+		{
+			str_num_level = std::to_string(num_level);
+			label_temp = new TreeLOC::label(str_num_level);
+			t_t_2 = TreeLOC::CREATE3(label_temp, t_t_3, t_t_3, t_t_3);
+			num_level++;
+			str_num_level = std::to_string(num_level);
+			label_temp = new TreeLOC::label(str_num_level);
+			t_t_3 = TreeLOC::CREATE3(label_temp, t_t_2, t_t_2, t_t_2);
+			num_level++;
+		}
+
+		if (n % 2 == 0)	// if n is even
+		{
+			t_t_final = t_t_2;
+		} else {		// if n is odd
+			t_t_final = t_t_3;
+		}
+	}
+
+	for (j = 1; j <= runs; j++)
+	{
+		t_start = std::chrono::steady_clock::now(); // Traverse
+
+		t_traverse_pre_LOC(t_t_final, t_t_final->ROOT());
+		if (VERBOSE)
+			std::cout << std::endl;
+
+		t_end = std::chrono::steady_clock::now();
+		t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+		traverse_pre_avg = traverse_pre_avg + t_elapsed.count();
+	}
+
+	traverse_pre_avg = traverse_pre_avg / runs;
+	std::cout << "Traversal average, preorder = " << traverse_pre_avg  << " ns " << std::endl;
+
+	for (j = 1; j <= runs; j++)
+	{
+		t_start = std::chrono::steady_clock::now(); // Traverse
+
+		t_traverse_post_LOC(t_t_final, t_t_final->ROOT());
+		if (VERBOSE)
+			std::cout << std::endl;
+
+		t_end = std::chrono::steady_clock::now();
+		t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+		traverse_post_avg = traverse_post_avg + t_elapsed.count();
+	}
+
+	traverse_post_avg = traverse_post_avg / runs;
+	std::cout << "Traversal average, postorder = " << traverse_post_avg  << " ns " << std::endl;
+
+
+}
+
+void time_tree_lcrs()
+{
+
+}
+
+void time_tree_lcrs_cur()
+{
+	auto t_start = std::chrono::steady_clock::now();
+	auto t_end = std::chrono::steady_clock::now();
+	auto t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+	std::ofstream file_out;
+
+	int j, k;
+	unsigned long int traverse_pre_avg = 0;
+	unsigned long int traverse_post_avg = 0;
+
+	int num_iter = ((double)n / 2) - 1;
+
+	TreeLCRS_cur::label label4;
+	std::strcpy(label4.value, "1");
+
+	TreeLCRS_cur::Tree<int> t_t_1 = TreeLCRS_cur::CREATE0<int>(label4);
+	TreeLCRS_cur::Tree<int> t_t_2 = TreeLCRS_cur::Tree<int>();
+	TreeLCRS_cur::Tree<int> t_t_3 = TreeLCRS_cur::Tree<int>();
+	TreeLCRS_cur::Tree<int> t_t_final = TreeLCRS_cur::Tree<int>();
+
+	std::cout << "Generating full tree with " << n << " levels... \n";
+
+
+	/* n = 1 */
+	if (n == 1)
+	{
+		/* nothing to do */
+	/* n = 2 */
+	} else if (n == 2) {
+		std::strcpy(label4.value, "2");
+		t_t_final = TreeLCRS_cur::CREATE3(label4, t_t_1, t_t_1, t_t_1);
+	/* n = 3 */
+	} else if (n == 3) {
+		std::strcpy(label4.value, "2");
+		t_t_2 = TreeLCRS_cur::CREATE3(label4, t_t_1, t_t_1, t_t_1);
+		std::strcpy(label4.value, "3");
+		t_t_final = TreeLCRS_cur::CREATE3(label4, t_t_2, t_t_2, t_t_2);
+	/* general case */
+	} else {
+		std::strcpy(label4.value, "2");
+		t_t_2 = TreeLCRS_cur::CREATE3(label4, t_t_1, t_t_1, t_t_1);
+		std::strcpy(label4.value, "3");
+		t_t_3 = TreeLCRS_cur::CREATE3(label4, t_t_2, t_t_2, t_t_2);
+
+		int num_level = 4;
+		char str_num_level[32];
+		for (k = 0; k < num_iter; k++)
+		{
+			std::sprintf(str_num_level, "%d", num_level);
+			std::strcpy(label4.value, str_num_level);
+			t_t_2 = TreeLCRS_cur::CREATE3(label4, t_t_3, t_t_3, t_t_3);
+			num_level++;
+			std::sprintf(str_num_level, "%d", num_level);
+			std::strcpy(label4.value, str_num_level);
+			t_t_3 = TreeLCRS_cur::CREATE3(label4, t_t_2, t_t_2, t_t_2);
+			num_level++;
+		}
+
+		if (n % 2 == 0)	// if n is even
+		{
+			t_t_final = t_t_2;
+		} else {		// if n is odd
+			t_t_final = t_t_3;
+		}
+	}
+
+	for (j = 1; j <= runs; j++)
+	{
+		t_start = std::chrono::steady_clock::now(); // Traverse
+
+		t_traverse_pre_LCRS_cur(t_t_final, t_t_final.ROOT());
+		if (VERBOSE)
+			std::cout << std::endl;
+
+		t_end = std::chrono::steady_clock::now();
+		t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+		traverse_pre_avg = traverse_pre_avg + t_elapsed.count();
+	}
+
+	traverse_pre_avg = traverse_pre_avg / runs;
+	std::cout << "Traversal average, preorder = " << traverse_pre_avg  << " ns " << std::endl;
+
+	for (j = 1; j <= runs; j++)
+	{
+		t_start = std::chrono::steady_clock::now(); // Traverse
+
+		t_traverse_post_LCRS_cur(t_t_final, t_t_final.ROOT());
+		if (VERBOSE)
+			std::cout << std::endl;
+
+		t_end = std::chrono::steady_clock::now();
+		t_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start);
+		traverse_post_avg = traverse_post_avg + t_elapsed.count();
+	}
+
+	traverse_post_avg = traverse_post_avg / runs;
+	std::cout << "Traversal average, postorder = " << traverse_post_avg  << " ns " << std::endl;
+
+}
+
+void problem_23b()
+{
+	List::List<int>* li_1 = new List::List<int>;
+	List::List<int>* li_2 = new List::List<int>;
+	List::List<int>* li_3 = new List::List<int>;
+	List::List<int>* li_4 = new List::List<int>;
+	List::List<int>* li_5 = new List::List<int>;
+	List::List<int>* li_7;
+	List::List<int>* arr[10];
+	int i;
+
+	for (i = 1; i < 20; i = i + 5)
+	{
+		li_1->push_back(i);
+		li_2->push_back(i + 1);
+		li_3->push_back(i + 2);
+		li_4->push_back(i + 3);
+		li_5->push_back(i + 4);
+	}
+
+	List::display_list(li_1);
+	List::display_list(li_2);
+	List::display_list(li_3);
+	List::display_list(li_4);
+	List::display_list(li_5);
+
+	arr[0] = li_1;
+	arr[2] = li_2;
+	arr[1] = li_3;
+	arr[3] = li_4;
+	arr[4] = li_5;
+
+//		li_7 = merge_n_lists(arr, 3);
+	li_7 = merge_sorted(arr, 5);
+
+	List::display_list(li_7);
+}
+
+void problem_24()
+{
+	List::List<int>* li_1 = new List::List<int>;
+	List::List<int>* li_2 = new List::List<int>;
+	List::List<int>* li_3 = new List::List<int>;
+	List::List<List::List<int>*>* li_4 = new List::List<List::List<int>*>;
+	List::List<int>* li_5 = new List::List<int>;
+	int i;
+
+	for (i = 1; i < 6; i++)
+	{
+		li_1->push_back(i);
+		li_2->push_back(i + 5);
+		li_3->push_back(i + 10);
+	}
+
+	List::display_list(li_1);
+	List::display_list(li_2);
+	List::display_list(li_3);
+
+	li_4->push_back(li_1);
+	li_4->push_back(li_2);
+	li_4->push_back(li_3);
+
+	li_5 = list_concatenate(li_4);
+
+	List::display_list(li_5);
+}
+
+//template<typename T>
+//void print_level(TreeLOC::node<T>* r)
+//{
+//	w
+//}
+
+template<typename T>
+void print_levels(TreeLOC::Tree<T>* t)
+{
+	TreeLOC::node<T>* c1;
+	TreeLOC::node<T>* c2;
+
+	Queue::Queue<TreeLOC::node<T>*>* visited_nodes = new Queue::Queue<TreeLOC::node<T>*>;
+
+	List::List<std::string>* level  = new List::List<std::string>;
+
+	visited_nodes->ENQUEUE(t->ROOT());
+
+	int it1 = 1;
+	int it2 = 1;
+
+	while (1)
+	{
+
+		std::cout << "Iteration " << it1 << std::endl;
+		it1++;
+		it2 = 1;
+
+		if (visited_nodes->EMPTY() && it1 > 15)
+		{
+			std::cout << "Queue empty, quitting \n";
+			break;
+		}
+
+		while (!visited_nodes->EMPTY())
+		{
+
+			std::cout << "Iteration " << it2 << std::endl;
+			it2++;
+			c1 = visited_nodes->FRONT()->value;
+			std::cout << "Attempting to print ";
+			std::cout << c1->label << ", ";
+			visited_nodes->DEQUEUE();
+
+			if (c1->LEFTMOST_CHILD() != NULL)
+			{
+				visited_nodes->ENQUEUE(c1->LEFTMOST_CHILD());
+			}
+			if (c1->RIGHT_SIBLING() != NULL)
+			{
+				visited_nodes->ENQUEUE(c1->RIGHT_SIBLING());
+			}
+
+		}
+
+		std::cout << std::endl;
+	}
+}
+
+void problem_310()
+{
+	std::cout << "\n\t========== Problem 3.10 ========== \n\n";
+
+	TreeLOC::label* label3;
+	TreeLOC::Tree<int>* T15 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T16 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T17 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T18 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T19 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T21 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T22 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T23 = new TreeLOC::Tree<int>;
+	TreeLOC::Tree<int>* T24 = new TreeLOC::Tree<int>;
+
+	List::List<TreeLOC::Tree<int>*>* list_trees_loc = new List::List<TreeLOC::Tree<int>*>; // List of pointers to free memory after
+
+	list_trees_loc->push_back(T15);
+	list_trees_loc->push_back(T16);
+	list_trees_loc->push_back(T17);
+	list_trees_loc->push_back(T18);
+	list_trees_loc->push_back(T19);
+	list_trees_loc->push_back(T21);
+	list_trees_loc->push_back(T22);
+	list_trees_loc->push_back(T23);
+	list_trees_loc->push_back(T24);
+
+
+	label3 = new TreeLOC::label("A");
+	T15 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("B");
+	T16 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("C");
+	T17 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("D");
+	T18 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("E");
+	T19 = TreeLOC::CREATE0<int>(label3);
+
+	label3 = new TreeLOC::label("G");
+	T21 = TreeLOC::CREATE2(label3, T15, T16);
+
+	label3 = new TreeLOC::label("H");
+	T22 = TreeLOC::CREATE3(label3, T17, T18, T19);
+
+	label3 = new TreeLOC::label("I");
+	T23 = TreeLOC::CREATE2(label3, T21, T22);
+
+	print_levels(T23);
+
+}
+
+
+template<typename T>
+int array_locate(T arr[], T x)
+{
+	int size = sizeof(arr)/(int)sizeof(arr[0]);
+
+	for (int i = 0; i < size; i++)
+	{
+		T* llhs = (T*)&arr[i];
+		T* lrhs = (T*)&x;
+
+		if (*llhs == *lrhs)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+bool is_not_empty( const std::string& str)
+{
+	return !str.empty();
+}
+
+template<typename T>
+TreeLOC::Tree<T>* create_t_from_pre(TreeLOC::Tree<T>* dummy, List::List<std::string>* li_pre)
+{
+	List::node<std::string>* p_a;
+	List::node<std::string>* p_b;
+	TreeLOC::label* label_left, * label_right, * label_parent;
+	TreeLOC::Tree<T>* tree_left, * tree_right, * tree_temp;
+
+	bool first = true;
+
+	p_a = li_pre->front();
+	p_b = li_pre->back();
+
+	while (p_a->get_next() != NULL)
+	{
+		if (first)
+		{
+			label_left = new TreeLOC::label(p_b->data);
+			label_right = new TreeLOC::label(p_a->data);
+
+			tree_left = TreeLOC::CREATE0<int>(label_left);
+			tree_right = TreeLOC::CREATE0<int>(label_right);
+
+			first = false;
+		} else {
+			label_right = new TreeLOC::label(p_a->data);
+			tree_left = tree_temp;
+			tree_right = TreeLOC::CREATE0<int>(label_right);
+		}
+
+		label_parent = new TreeLOC::label(p_b->get_previous()->data);
+		tree_temp = TreeLOC::CREATE2(label_parent, tree_left, tree_right);
+
+		p_a = p_a->get_next();
+		p_b = p_b->get_previous();
+	}
+
+	return tree_temp;
+}
+
+void problem_313()
+{
+	// Preorder to post order
+	TreeLOC::Tree<int>* constructed;
+	List::List<std::string>* pre = new List::List<std::string>();
+
+	pre->push_back("A");
+	pre->push_back("B");
+	pre->push_back("C");
+	pre->push_back("D");
+	pre->push_back("E");
+	pre->push_back("F");
+	pre->push_back("G");
+	pre->push_back("H");
+	pre->push_back("I");
+
+	constructed = create_t_from_pre(constructed, pre);
+	t_traverse_pre_LOC(constructed, constructed->ROOT());
+
+}
+
+void problem_314()
+{
+
+}
+
+void problem_34()
+{
+
+}
+
+
+int main(int argc, char** argv)
+{
+	std::string::size_type size_string;
+	std::string arg1, arg2;
+
+
+	if (argc < 2) {
+		std::cout << "Usage: " << argv[0] << "<action> <# of tree levels>" << std::endl;
+		exit(EXIT_SUCCESS);
+	} else if (argc == 2) {
+		arg1 = (std::string) argv[1];
+	} else if (argc == 3)
+	{
+		arg1 = (std::string) argv[1];
+		arg2 = (std::string) argv[2];
+		n = std::stoi(arg2, &size_string, 10);
+	} else {
+		std::cout << "Usage: " << argv[0] << "<action> <# of tree levels>" << std::endl;
+		exit(EXIT_SUCCESS);
+	}
+
+	std::cout << "Arg 1: " << arg1 << std::endl;
+
+	if (arg1.compare("test_queue") == 0)
+	{
+		test_queue();
+
+	} else if (arg1.compare("test_tree_loc") == 0) {
+		test_tree_loc();
+
+	} else if (arg1.compare("test_tree_lcrs") == 0) {
+		test_tree_lcrs();
+
+	} else if (arg1.compare("test_tree_lcrs_cur") == 0) {
+		test_tree_lcrs_cur();
+
+	} else if (arg1.compare("time_tree_loc") == 0) {
+		time_tree_loc();
+
+	} else if (arg1.compare("time_tree_lcrs") == 0) {
+		time_tree_lcrs();
+
+	} else if (arg1.compare("time_tree_lcrs_cur") == 0) {
+		time_tree_lcrs_cur();
+
+	} else if (arg1.compare("2.3b") == 0) {
+		problem_23b();
+
+	} else if (arg1.compare("2.4") == 0) {
+		problem_24();
+
+	} else if (arg1.compare("3.10") == 0) {
+		problem_310();
+
+	} else if (arg1.compare("3.13") == 0) {
+		problem_313();
+
+	} else if (arg1.compare("3.14") == 0) {
+		problem_314();
+
+	} else if (arg1.compare("3.4") == 0) {
+		problem_34();
+	}
+
+	std::exit(EXIT_SUCCESS);
+}

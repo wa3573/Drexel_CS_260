@@ -1,0 +1,262 @@
+#include <stdio.h>
+#include <iostream>
+#include <stdlib.h>
+#include <initializer_list>
+#include <tuple>
+
+#define TREE_LCRS_MAX_NODES 1E6
+
+namespace TreeLCRS
+{
+	template<typename T>
+	class Tree;
+
+	struct label {
+		char	value[32];
+	};
+
+	template<typename T>
+	struct cell {
+		T	data;
+	};
+
+	template<typename T>
+	struct node {
+		label*		label;
+		node<T>*	left_child;
+		node<T>*	right_sib;
+		node<T>*	parent;
+		cell<T>*	cell;
+		node<T>*	RIGHT_SIBLING();
+		node<T>*	LEFTMOST_CHILD();
+	};
+
+	template<typename T>
+	node<T>* node<T>::LEFTMOST_CHILD()
+	{
+		node<T>* target;
+		Tree<T> temp;
+
+		target = temp.LEFTMOST_CHILD(this);
+		return target;
+	}
+
+
+	template<typename T>
+	node<T>* node<T>::RIGHT_SIBLING()
+	{
+		node<T>* target;
+		Tree<T> temp;
+
+		target = temp.RIGHT_SIBLING(this);
+		return target;
+	}
+
+	template<typename T>
+	class Tree
+	{
+		node<T>*	root;
+		void		free_node(node<T>* n);
+	public:
+					Tree();
+					~Tree() { destroy(); }
+					Tree(label* lab);
+		node<T>* 	PARENT(node<T>* n);
+		node<T>* 	LEFTMOST_CHILD(node<T>* n);
+		node<T>* 	LEFTMOST_CHILD();
+		node<T>* 	RIGHT_SIBLING(node<T>* n);
+
+		label* 		LABEL(node<T>* n);
+		void		SET_ROOT_DATA(T r);
+
+		node<T>* 	ROOT();
+		void 		MAKENULL();
+		void		destroy();
+		Tree<T>*	CREATE(label* v, std::initializer_list<Tree<T>*> args);
+	};
+
+	template<typename T>
+	Tree<T>* CREATE0(label* v);
+
+	template<typename T>
+	Tree<T>* CREATE1(label* v, Tree<T>* T1);
+
+	template<typename T>
+	Tree<T>* CREATE2(label* v, Tree<T>* T1, Tree<T>* T2);
+
+	template<typename T>
+	Tree<T>* CREATE3(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3);
+
+	template<typename T>
+	Tree<T>* CREATE4(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3,
+			Tree<T>* T4);
+
+	template<typename T>
+	Tree<T>::Tree()
+	{
+		MAKENULL();
+	}
+
+	template<typename T>
+	Tree<T>::Tree(label* lab)
+	{
+		MAKENULL();
+		root->label = lab;
+	}
+
+	template<typename T>
+	node<T>* Tree<T>::PARENT(node<T>* n)
+	{
+		return n->parent;
+	}
+
+template<typename T>
+	node<T>* Tree<T>::LEFTMOST_CHILD(node<T>* n)
+	{
+		return n->left_child;
+	}
+
+template<typename T>
+	node<T>* Tree<T>::LEFTMOST_CHILD()
+	{
+		return root->left_child;
+	}
+
+template<typename T>
+	node<T>* Tree<T>::RIGHT_SIBLING(node<T>* n)
+	{
+		return n->right_sib;
+	}
+
+template<typename T>
+	label* Tree<T>::LABEL(node<T>* n)
+	{
+		return n->label;
+	}
+
+template<typename T>
+	void Tree<T>::MAKENULL()
+	{
+		root = new node<T>;
+		root->label = new label;
+		root->cell = new cell<T>;
+
+		root->left_child = NULL;
+		root->parent = NULL;
+		root->right_sib = NULL;
+
+	}
+
+	template<typename T>
+	void Tree<T>::destroy()
+	{
+		free_node(root);
+	}
+
+	template<typename T>
+	node<T>* Tree<T>::ROOT()
+	{
+		return root;
+	}
+
+	template<typename T>
+	void Tree<T>::SET_ROOT_DATA(T data)
+	{
+		root->cell->data = data;
+	}
+
+
+	template<typename T>
+	Tree<T>* CREATE0(TreeLCRS::label* v)
+	{
+		Tree<T>* new_tree = new Tree<T>(v);
+
+		return new_tree;
+	}
+
+	template<typename T>
+	Tree<T>* CREATE1(label* v, Tree<T>* T1)
+	{
+		Tree<T>* new_tree = new Tree<T>;
+		return new_tree->CREATE(v, {T1});
+	}
+
+	template<typename T>
+	Tree<T>* CREATE2(label* v, Tree<T>* T1, Tree<T>* T2)
+	{
+		Tree<T>* new_tree = new Tree<T>;
+		return new_tree->CREATE(v, {T1, T2});
+	}
+
+	template<typename T>
+	Tree<T>* CREATE3(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3)
+	{
+		Tree<T>* new_tree = new Tree<T>;
+		return new_tree->CREATE(v, {T1, T2, T3});
+	}
+
+	template<typename T>
+	Tree<T>* CREATE4(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3,
+			Tree<T>* T4)
+	{
+		Tree<T>* new_tree;
+		return new_tree->CREATE(v, {T1, T2, T3, T4});
+	}
+
+	template<typename T>
+	Tree<T>* Tree<T>::CREATE(label* v, std::initializer_list<Tree<T>*> args)
+	{
+		Tree<T>* new_tree = new Tree<T>;
+		Tree<T>* const* it = args.begin();
+		node<T>* temp;
+
+		if (v == NULL)
+		{
+			v = new label;
+		}
+
+		new_tree->root->label = v;
+
+		/* if the initializer_list is empty */
+		if (args.begin() == args.end())
+		{
+			new_tree->root = new node<T>;	// Make a new node for root
+		} else {
+		/* Make the first argument the leftmost child of the new root */
+			new_tree->root->left_child = (*args.begin())->root;
+
+			temp = new_tree->root->left_child;
+			/* For the rest of the arguments, add them as right siblings to the last */
+			for (it = args.begin() + 1; it != args.end(); it++)
+			{
+				temp->right_sib = (*it)->root;
+				temp = temp->right_sib;
+			}
+		}
+
+		return new_tree;
+	}
+
+	template<typename T>
+	void Tree<T>::free_node(node<T>* n) // Free node and all its children
+	{
+		node<T>* temp = NULL;
+
+		if (n->left_child != NULL) 		// Node has children
+		{
+			free_node(n->left_child);	// Recursive call on left_child
+		}
+
+		temp = n->right_sib;
+		while (temp != NULL) 		// While there is a right sibling
+		{
+			free_node(temp);		// Recursive call on sibling
+			temp = n->right_sib; 	// Move to next sibling
+		}
+
+		delete n->cell;
+		delete n->label;
+		delete n;
+	}
+
+}

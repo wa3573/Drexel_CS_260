@@ -1,0 +1,55 @@
+Ehsan,
+
+Everything here has been implemented as per the textbook's (Aho's Data 
+Structures and Algorithms) descriptions and often direct translations from the
+Pascal pseudocode. 
+
+Note: I had not programmed in C++ before this project, and most of my 
+experience is from C and Python. I actually chose C++ because I was less
+comfortable with it than Python, and felt that the project could improve my
+comfort level with direct memory managment. You will notice a mix of 
+'printf("text");' and 'std::cout << text;' throughout. Which is a product
+of my C backgroud, before I knew that cout was the C++ standard. I did not
+see the need to rewrite the code to change this.
+
+You will note that this is essentially C code, with namespaces, I do not take
+advantage of C++'s integrated object oriented capabilities, even though I am
+familiar with programing in that style with Python.
+
+Also, if the layout/orginization seems weird, that's because I completed this
+almost entirely before the submission guidelines were posted, and adjusted
+everything to fit them after the fact. Also, forgive my inconsistent
+formatting, I have since been using Google's style guide, which seems modern,
+and aligns with my own views.
+
+My timing scheme is basically running each function in question for several
+input sizes on a logaritmic scale, ie 1E3, 1E4, 1E5 etc. and then dividing
+the time obtained by a function of n and n^2 ( T(n) / f(n) or
+T(n) / f(n^2) ) the result which tends toward a non-zero constant indicates
+that the function's asymptotic complexity is of that order given by the
+function in the denominator. Results were as expected. 
+
+There are some parts of the implementations that I do not particularly agree
+with. However, as an excercise, especially concerning computational complexity,
+I believe it was useful to implement as per the descriptions.
+
+I typically implement pointer based lists with an artificial head AND tail,
+and design each node to contain pointers to both next AND previous, this
+eliminates the quadratic complexity we observe in PREVIOUS() and END() in
+the pointer implemenation of lists, and is most likely how the library
+class std::list achieves linear complexity. Nonetheless, I did not do this,
+since that was not the implemenation described in the book.
+
+You will note a slight difference in the handling of certain functions when
+comparing implementations with pointers vs arrays, specifically END(). For the
+array implementation, the textbook states that END() should return the index
+of one past the index holding the last value. This is in contrast to END() with
+pointers, where the text specifies that the function returns a pointer to the
+last cell, that which points to NULL. In both implementations, RETRIEVE()
+returns the element which immediately follows the cell given as an argument.
+This means that the procedure to obtain the last value in a list differs for
+the two implemenations. 
+
+Thanks, sorry for the long readme.
+-Bill
+

@@ -1,0 +1,82 @@
+/*
+ * tree_loc.h
+ *
+ *  Created on: Aug 12, 2018
+ *      Author: Juniper
+ */
+#include <string>
+#include "list.cpp"
+
+#ifndef TREE_LOC_H_
+#define TREE_LOC_H_
+
+namespace TreeLOC
+{
+	template<typename T>
+	class Tree;
+
+	class label {
+	public:
+		std::string get_value() { return value; }
+		explicit label(std::string in);
+	private:
+		std::string value = "";
+	};
+
+	template<typename T>
+	struct node {
+		T 						value;
+		node<T>*				parent;
+		List::List<node<T>*>*	children;
+		label* 					label;
+		node<T>*				RIGHT_SIBLING();
+		node<T>*				LEFTMOST_CHILD();
+		TreeLOC::label* 		LABEL();
+	};
+
+	template<typename T>
+	class Tree
+	{
+		node<T>*	root;
+		void		free_node(node<T>* n);
+	public:
+					Tree();
+					~Tree();
+					Tree(label* lab);
+		node<T>* 	PARENT(node<T>* n);
+		node<T>* 	LEFTMOST_CHILD(node<T>* n);
+		node<T>* 	LEFTMOST_CHILD();
+		node<T>* 	RIGHT_SIBLING(node<T>* n);
+
+		label* 		LABEL(node<T>* n);
+		void 		SET_LABEL(node<T>* n, label* l);
+		void		SET_ROOT_VALUE(T r);
+
+		node<T>* 	ROOT();
+		void 		MAKENULL();
+		void		destroy();
+
+		Tree<T>*	CREATE(label* v, std::initializer_list<Tree<T>*> args);
+		List::List<node<T>*>	CHILDREN();
+	};
+
+
+	template<typename T>
+	Tree<T>* CREATE0(label* v);
+
+	template<typename T>
+	Tree<T>* CREATE1(label* v, Tree<T>* T1);
+
+	template<typename T>
+	Tree<T>* CREATE2(label* v, Tree<T>* T1, Tree<T>* T2);
+
+	template<typename T>
+	Tree<T>* CREATE3(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3);
+
+	template<typename T>
+	Tree<T>* CREATE4(label* v, Tree<T>* T1, Tree<T>* T2, Tree<T>* T3,
+			Tree<T>* T4);
+}
+
+
+#endif /* TREE_LOC_H_ */

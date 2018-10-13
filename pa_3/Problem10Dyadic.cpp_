@@ -1,0 +1,122 @@
+/*
+ * Problem10Dyadic.cpp
+ *
+ *  Created on: Aug 26, 2018
+ *      Author: Juniper
+ */
+
+#include <iostream>
+#include <complex>
+#include <vector>
+
+using std::vector;
+using std::complex;
+
+namespace P9DYADIC
+{
+
+bool check_args(int n, vector<complex<double>> x)
+{
+
+	if (!n)
+	{
+		std::cout << "Error: FFT size is zero. \n";
+
+		return false;
+	}
+
+	if (!x.size())
+	{
+		return false;
+	} else if (x.size() != (unsigned int)n)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+vector<complex<double>> FFT(int n, vector<complex<double>> x)
+{
+	vector<complex<double>> v_NULL = vector<complex<double>>();
+	vector<complex<double>> fft;
+	vector<complex<double>> evens, odds, u, v;
+	complex<double> i = complex<double>(0, 1); //i constant value
+	complex<double> exp_arg, tau;
+	complex<double> c_zero = complex<double>(0.0, 0.0);
+
+	int j;
+	int k;
+	double pi = 3.1415926535897932384626433832795;
+
+	if (!check_args(n, x))
+	{
+		return v_NULL;
+	}
+
+	for (j = 0; j < n; j++)
+	{
+		fft.insert(fft.end(), c_zero);
+	}
+
+	if (n == 1)
+	{
+		fft[0] = x[0];
+		return fft;
+	} else
+	{
+		for (j = 0; j <= (n - 2); j += 2)
+		{
+			evens.push_back(x[j]);
+			odds.push_back(x[j + 1]);
+		}
+	}
+
+	u = FFT(n / 2, evens);
+	v = FFT(n / 2, odds);
+
+	for (k = 0; k < n; k++)
+	{
+		exp_arg = ((2 * pi * k) / n) * i;
+		tau = std::exp(exp_arg);
+		int index = k % (n / 2);
+		fft[k] = u[index] + tau * v[index];
+	}
+
+	return fft;
+
+}
+
+}
+
+int main(int argc, char** argv)
+{
+	vector<complex<double> > test_values;
+	int n = 16;
+	std::cout << "Input data: \n";
+	for (int i = 0; i < n; i++)
+	{
+		test_values.push_back(complex<double>(i, 0));
+		std::cout << test_values[i] << "\n";
+	}
+	std::cout << std::endl;
+
+	vector<complex<double> > fftresults = P9DYADIC::FFT(n, test_values);
+
+	std::cout << "Results, FFT(): \n";
+	for (int i = 0; i < n; i++)
+	{
+		std::cout << fftresults[i] << "\n";
+	}
+
+	std::cout << "\nResults, MATLAB: \n" << "   1.0e+02 * \n"
+			<< "1.2000 + 0.0000i\n" << "-0.0800 + 0.4022i\n"
+			<< "-0.0800 + 0.1931i\n" << "-0.0800 + 0.1197i\n"
+			<< "-0.0800 + 0.0800i\n" << "-0.0800 + 0.0535i\n"
+			<< "-0.0800 + 0.0331i\n" << "-0.0800 + 0.0159i\n"
+			<< "-0.0800 + 0.0000i\n" << "-0.0800 - 0.0159i\n"
+			<< "-0.0800 - 0.0331i\n" << "-0.0800 - 0.0535i\n"
+			<< "-0.0800 - 0.0800i\n" << "-0.0800 - 0.1197i\n"
+			<< "-0.0800 - 0.1931i\n" << "-0.0800 - 0.4022i\n";
+	return 0;
+}
